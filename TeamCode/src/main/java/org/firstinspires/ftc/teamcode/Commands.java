@@ -36,6 +36,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.GyroSensor;
 import com.qualcomm.robotcore.hardware.LightSensor;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -59,12 +60,15 @@ public class Commands extends OpMode {
     // the front wheels, and the length is between the centers of the wheels on one of the sides.
     static double wheelDia = 4.0, DTLength = 13.0, DTWidth = 16.0;
 
-    //this is the number of encoder ticks per motor rotation. AndyMark motors are typically 7 ticks
-    // times the gear ratio. an AM 40 would have 280 ticks.
-    static int ticksPerRotation = 140;
+    //this is the number of encoder ticks per motor rotation divided by the drivetrain gear ratio.
+    // AndyMark motors are typically 7 ticks times the gear ratio. an AM 40 would have 280 ticks.
+    static int ticksPerRotation = 210;
 
 
     private ElapsedTime runtime = new ElapsedTime();
+
+    //runMotors methods~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //these methods run sets of motors at specified powers
 
     //run the left motors
     void runLMotors(double power) {
@@ -96,6 +100,7 @@ public class Commands extends OpMode {
         runReMotors(power);
     }
 
+    //distToTicks~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //find the ticks it takes to run a distance.
     int distToTicks (double distance){
         int tickPerDist = (int) (ticksPerRotation / (wheelDia * Math.PI));
@@ -103,6 +108,7 @@ public class Commands extends OpMode {
         return totalTicks;
     }
 
+    //driveForward~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //drive forward a certain distance in inches
     void driveForward(double distance, double power){
         int initPos = FRMotor.getCurrentPosition();
@@ -129,6 +135,22 @@ public class Commands extends OpMode {
         stopAllMotors();
     }
 
+    //drivetrainRadius~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //finds the radius of the robot drive train based on above inputs
+    double drivetrainRadius(){
+        return Math.sqrt(Math.pow(DTLength, 2) + Math.pow(DTWidth, 2)) / 2;
+    }
+
+    //ticksPerDegreeRot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //finds the number of ticks per degree of robot rotation based on inputs found at the top of the
+    //program
+    int ticksPerDegreeRot(){
+        double DTCir = Math.PI * 2 * drivetrainRadius();
+        double degPerInRot = DTCir / 360;
+        return (int) Math.round(degPerInRot * distToTicks(1));
+    }
+
+    //encoderTurn~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //turn a certain number of degrees using the motor encoders
     void encoderTurn(int degrees, double power){
         int initPos = FRMotor.getCurrentPosition();
@@ -137,11 +159,63 @@ public class Commands extends OpMode {
         //check turn direction
         if (degrees > 0){
             //will be turning right
+            endPos = initPos - (ticksPerDegreeRot() * degrees);
 
+            while (endPos < initPos){
+                runRMotors(-power);
+                runLMotors(power);
+            }
+            stopAllMotors();
+        }
+        else if (degrees < 0){
+            //will be turning left
+            endPos = initPos + (ticksPerDegreeRot() * degrees);
 
+            while (endPos > initPos){
+                runRMotors(power);
+                runLMotors(-power);
+            }
+            stopAllMotors();
         }
     }
 
+    //delay~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //stops the program for a set number of milliseconds.
+    void delay (long time){
+        try{
+            Thread.sleep(time);
+        } catch (InterruptedException e){
+            telemetry.addData("Err:", e.getMessage());
+        }
+    }
+
+    //gyroTurn~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    void gyroTurn (int degrees, double power){
+        gyro.calibrate();
+
+        while (gyro.isCalibrating()){
+            delay(10);
+        }
+
+        if (degrees > 0){
+            //turn right
+            while (degrees < gyro.getHeading()) {
+                runLMotors(power);
+                runRMotors(-power);
+            }
+            stopAllMotors();
+        }
+        else if (degrees < 0){
+            //turn left
+            while ((degrees + 360) > gyro.getHeading()) {
+                runLMotors(-power);
+                runRMotors(power);
+            }
+            stopAllMotors();
+        }
+    }
+
+    //stopAllMotors~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //stop all of the drive motors
     void stopAllMotors() {
         runAllMotors(0);
@@ -155,7 +229,11 @@ public class Commands extends OpMode {
         BRMotor = hardwareMap.dcMotor.get("BRMotor");
         BLMotor = hardwareMap.dcMotor.get("BLMotor");
 
-        color = hardwareMap.colorSensor.get("color");
+        FRMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        BLMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        //color = hardwareMap.colorSensor.get("color");
+        gyro = hardwareMap.gyroSensor.get("gyro");
     }
 
     /*
@@ -172,8 +250,6 @@ public class Commands extends OpMode {
      */
     @Override
     public void start() {
-        runtime.reset();
-        driveForward(70, 1);
     }
 
     /*

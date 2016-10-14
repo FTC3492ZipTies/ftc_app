@@ -34,19 +34,23 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
  * Demonstrates empty OpMode
  */
-@Autonomous(name = "TeleOp1", group = "TeleOp")
+@TeleOp(name = "TeleOp1", group = "TeleOp")
 
 public class TeleOp1 extends OpMode {
 
   private ElapsedTime runtime = new ElapsedTime();
 
   DcMotor RRMotor, RLMotor, FRMotor, FLMotor;
+  Servo GServo1, GServo2;
+  DcMotor Lift;
 
   @Override
   public void init() {
@@ -59,10 +63,15 @@ public class TeleOp1 extends OpMode {
      */
   @Override
   public void init_loop() {
-    RRMotor = hardwareMap.dcMotor.get("RRMotor");
-    RLMotor = hardwareMap.dcMotor.get("RLMotor");
+    RRMotor = hardwareMap.dcMotor.get("BRMotor");
+    RLMotor = hardwareMap.dcMotor.get("BLMotor");
     FRMotor = hardwareMap.dcMotor.get("FRMotor");
     FLMotor = hardwareMap.dcMotor.get("FLMotor");
+    Lift = hardwareMap.dcMotor.get("lift");
+
+
+    GServo1 = hardwareMap.servo.get("LLiftServo");
+    GServo2 = hardwareMap.servo.get("RLiftServo");
   }
 
   /*
@@ -86,8 +95,25 @@ public class TeleOp1 extends OpMode {
     RRMotor.setPower(gamepad1.right_stick_y);
     FRMotor.setPower(gamepad1.right_stick_y);
 
-    if (gamepad1.a){
-
+    if (gamepad1.dpad_up){
+      Lift.setPower(1);
     }
+    else if (gamepad1.dpad_down){
+      Lift.setPower(-1);
+    }
+    else{
+      Lift.setPower(0);
+    }
+
+    if (gamepad1.a){
+      GServo1.setPosition(.7);
+      GServo2.setPosition(.3);
+    }
+    else if (gamepad1.y){
+      GServo1.setPosition(0);
+      GServo2.setPosition(1);
+    }
+
+
   }
 }
